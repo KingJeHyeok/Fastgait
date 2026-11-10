@@ -137,9 +137,9 @@ def clones(module, N):
 
 
 def config_loader(path):
-    with open(path, 'r') as stream:
+    with open(path, 'r', encoding='utf-8') as stream:  # <- encoding='utf-8' 추가
         src_cfgs = yaml.safe_load(stream)
-    with open("./configs/default.yaml", 'r') as stream:
+    with open("./configs/default.yaml", 'r', encoding='utf-8') as stream:  # <- encoding='utf-8' 추가
         dst_cfgs = yaml.safe_load(stream)
     MergeCfgsDict(src_cfgs, dst_cfgs)
     return dst_cfgs

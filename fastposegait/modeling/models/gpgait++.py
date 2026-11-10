@@ -30,15 +30,15 @@ class GPGait_PlusPlus(BaseModel):
 
         ipts, labs, _, _, seqL = inputs
 
-        x = ipts[0] 
+        x = ipts[0]
         pose = x 
         N, C, T, V, M = x.size()
         if len(x.size()) == 4:
             x = x.unsqueeze(1)
         del ipts
-        x_pose = x[:,:2,...]
-        x_bone = x[:,2:4,...]
-        x_angle = x[:,4:5,:,5:,:]
+        x_pose = x[:,:2,...].contiguous()
+        x_bone = x[:,2:4,...].contiguous()
+        x_angle = x[:,4:5,:,5:,:].contiguous()
         feature_pose = self.pose(x_pose, seqL)
         feature_bone = self.bone(x_bone, seqL)
         feature_angle = self.angle(x_angle, seqL)

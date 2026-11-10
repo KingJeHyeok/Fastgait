@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTSP 실시간 보행 인식 시스템</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        /* 메인 레이아웃 */
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        /* 비디오 섹션 */
+        .video-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 */
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        .video-container img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        /* 상태 정보 */
+        .state-info {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .state-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        
+        .state-card-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .state-card-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        
+        .state-idle { border-left: 4px solid #808080; }
+        .state-detecting { border-left: 4px solid #00ffff; }
+        .state-collecting { border-left: 4px solid #00ff00; }
+        .state-lost { border-left: 4px solid #ffa500; }
+        
+        /* 통계 섹션 */
+        .stats-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+        
+        .stat-card h3 {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        /* 현재 인식 중 */
+        .current-person {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .person-id {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .person-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .status-new {
+            background: #ffd700;
+            color: #000;
+        }
+        
+        .status-matched {
+            background: #00ff00;
+            color: #000;
+        }
+        
+        /* 메트릭 */
+        .metrics-container {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+        
+        .metric-row {
+            margin-bottom: 12px;
+        }
+        
+        .metric-label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .metric-bar {
+            height: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .metric-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        
+        .metric-fill.cosine {
+            background: linear-gradient(90deg, #ff4444 0%, #ffaa00 50%, #00ff00 100%);
+        }
+        
+        .metric-fill.euclidean {
+            background: linear-gradient(90deg, #00ff00 0%, #ffaa00 50%, #ff4444 100%);
+        }
+        
+        .metric-value {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        
+        /* Person List */
+        .person-list {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .person-item {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .person-item-id {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .person-item-info {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            text-align: right;
+        }
+        
+        /* 이벤트 로그 */
+        .event-log-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .event-log {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .event-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid;
+            border-radius: 3px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .event-item.DETECTING { border-left-color: #00ffff; }
+        .event-item.COLLECTING { border-left-color: #00ff00; }
+        .event-item.LOST { border-left-color: #ffa500; }
+        .event-item.INFERENCE_PERIODIC,
+        .event-item.INFERENCE_FINAL { border-left-color: #ff00ff; }
+        .event-item.SESSION_LOCK { border-left-color: #00ff00; }
+        .event-item.SESSION_UNLOCK { border-left-color: #ff0000; }
+        .event-item.ID_CHANGE { border-left-color: #ffff00; }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .event-time {
+            color: #aaa;
+            margin-right: 10px;
+        }
+        
+        .event-type {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        /* 버튼 */
+        .controls {
+            text-align: center;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 0 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .no-data {
+            text-align: center;
+            opacity: 0.5;
+            padding: 30px;
+            font-style: italic;
+        }
+        
+        /* 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* 반응형 */
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .state-info {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚶 RTSP 실시간 보행 인식 시스템</h1>
+            <p class="subtitle">GPGait++ 기반 실시간 Person Re-Identification + YOLOv8-Pose</p>
+        </header>
+        
+        <div class="main-content">
+            <!-- 비디오 + 상태 영역 -->
+            <div class="video-section">
+                <h2 style="margin-bottom: 15px;">📹 Live RTSP Stream</h2>
+                
+                <!-- 비디오 스트림 -->
+                <div class="video-container">
+                    <img src="{{ url_for('video_feed') }}" alt="RTSP Video Stream">
+                </div>
+                
+                <!-- 상태 정보 -->
+                <div class="state-info">
+                    <div class="state-card" id="state-card">
+                        <div class="state-card-label">상태</div>
+                        <div class="state-card-value" id="state-value">IDLE</div>
+                    </div>
+                    <div class="state-card">
+                        <div class="state-card-label">버퍼 크기</div>
+                        <div class="state-card-value" id="buffer-size">0</div>
+                    </div>
+                    <div class="state-card">
+                        <div class="state-card-label">세션 상태</div>
+                        <div class="state-card-value" id="session-status">-</div>
+                    </div>
+                    <div class="state-card">
+                        <div class="state-card-label">FPS</div>
+                        <div class="state-card-value" id="fps">0</div>
+                    </div>
+                </div>
+                
+                <!-- 컨트롤 -->
+                <div class="controls">
+                    <button class="btn btn-danger" onclick="resetRegistry()">🔄 Registry 리셋</button>
+                </div>
+            </div>
+            
+            <!-- 통계 + 인물 정보 영역 -->
+            <div class="stats-section">
+                <h2 style="margin-bottom: 15px;">📊 실시간 통계</h2>
+                
+                <!-- 통계 카드 -->
+                <div class="stat-card">
+                    <h3>수신 프레임</h3>
+                    <div class="stat-value" id="received-frames">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>처리 프레임</h3>
+                    <div class="stat-value" id="processed-frames">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>YOLO 검출</h3>
+                    <div class="stat-value" id="yolo-detections">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>스켈레톤 추출</h3>
+                    <div class="stat-value" id="skeleton-extractions">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>모델 추론</h3>
+                    <div class="stat-value" id="inference-count">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>검출률</h3>
+                    <div class="stat-value" id="detection-rate">0%</div>
+                </div>
+                
+                <!-- 현재 인식 중 -->
+                <h2 style="margin: 20px 0 15px 0;">👤 현재 인식 중</h2>
+                <div id="current-person" class="current-person">
+                    <div class="no-data">인식 대기 중...</div>
+                </div>
+                
+                <!-- Person List -->
+                <h2 style="margin: 20px 0 15px 0;">👥 등록된 인물 (<span id="person-count">0</span>명)</h2>
+                <div class="person-list" id="person-list">
+                    <div class="no-data">등록된 인물이 없습니다</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 이벤트 로그 -->
+        <div class="event-log-section">
+            <h2 style="margin-bottom: 15px;">📝 이벤트 로그 (최근 20개)</h2>
+            <div class="event-log" id="event-log">
+                <div class="no-data">이벤트 없음</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 데이터 업데이트 (1초마다)
+        setInterval(updateStats, 1000);
+        
+        function updateStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.stats) return;
+                    
+                    // 통계 업데이트
+                    document.getElementById('fps').textContent = data.stats.fps || 0;
+                    document.getElementById('received-frames').textContent = data.stats.received_frames || 0;
+                    document.getElementById('processed-frames').textContent = data.stats.processed_frames || 0;
+                    document.getElementById('yolo-detections').textContent = data.stats.yolo_detections || 0;
+                    document.getElementById('skeleton-extractions').textContent = data.stats.skeleton_extractions || 0;
+                    document.getElementById('inference-count').textContent = data.stats.inference_count || 0;
+                    
+                    // 검출률
+                    const detectionRate = data.stats.processed_frames > 0 
+                        ? ((data.stats.detected_frames / data.stats.processed_frames) * 100).toFixed(1)
+                        : 0;
+                    document.getElementById('detection-rate').textContent = detectionRate + '%';
+                    
+                    // 상태 정보
+                    if (data.state_info) {
+                        const stateCard = document.getElementById('state-card');
+                        const stateValue = document.getElementById('state-value');
+                        const currentState = data.state_info.current_state || 'IDLE';
+                        
+                        stateValue.textContent = currentState;
+                        stateCard.className = 'state-card state-' + currentState.toLowerCase();
+                        
+                        document.getElementById('buffer-size').textContent = data.state_info.buffer_size || 0;
+                        
+                        const sessionStatus = data.state_info.session_locked ? 'LOCKED' : 'UNLOCKED';
+                        document.getElementById('session-status').textContent = sessionStatus;
+                    }
+                    
+                    // 현재 인식 중인 사람
+                    const currentPersonDiv = document.getElementById('current-person');
+                    if (data.current_person) {
+                        const person = data.current_person;
+                        const statusClass = person.is_new ? 'status-new' : 'status-matched';
+                        const statusText = person.is_new ? 'NEW' : 'MATCHED';
+                        
+                        const cosine = person.cosine_similarity || 0;
+                        const euclidean = person.euclidean_distance || 0;
+                        
+                        // 코사인: 0~1 (높을수록 좋음)
+                        const cosinePercent = (cosine * 100).toFixed(1);
+                        const cosineColor = cosine >= 0.92 ? '#00ff00' : cosine >= 0.85 ? '#ffaa00' : '#ff4444';
+                        
+                        // 유클리드: 0~무한 (낮을수록 좋음)
+                        const euclideanPercent = Math.min(100, (euclidean / 0.5) * 100).toFixed(1);
+                        const euclideanColor = euclidean <= 0.35 ? '#00ff00' : euclidean <= 0.5 ? '#ffaa00' : '#ff4444';
+                        
+                        currentPersonDiv.innerHTML = `
+                            <div class="person-id">Person #${person.id}</div>
+                            <div class="person-status ${statusClass}">${statusText}</div>
+                            <div style="margin-top: 10px; font-size: 1.1rem;">
+                                Match Score: <strong>${person.match_score.toFixed(3)}</strong>
+                            </div>
+                            <div class="metrics-container">
+                                <div class="metric-row">
+                                    <div class="metric-label">Cosine Similarity (높을수록 좋음)</div>
+                                    <div class="metric-bar">
+                                        <div class="metric-fill cosine" style="width: ${cosinePercent}%;">
+                                        </div>
+                                        <div class="metric-value" style="color: ${cosineColor};">${cosine.toFixed(4)}</div>
+                                    </div>
+                                </div>
+                                <div class="metric-row">
+                                    <div class="metric-label">Euclidean Distance (낮을수록 좋음)</div>
+                                    <div class="metric-bar">
+                                        <div class="metric-fill euclidean" style="width: ${euclideanPercent}%;">
+                                        </div>
+                                        <div class="metric-value" style="color: ${euclideanColor};">${euclidean.toFixed(4)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        currentPersonDiv.innerHTML = '<div class="no-data">인식 대기 중...</div>';
+                    }
+                    
+                    // Person List
+                    const personListDiv = document.getElementById('person-list');
+                    if (data.person_list && data.person_list.length > 0) {
+                        document.getElementById('person-count').textContent = data.person_list.length;
+                        
+                        let html = '';
+                        data.person_list.forEach(person => {
+                            html += `
+                                <div class="person-item">
+                                    <div class="person-item-id">Person #${person.id}</div>
+                                    <div class="person-item-info">
+                                        ${person.count} detections<br>
+                                        ${person.embeddings} embeddings
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        personListDiv.innerHTML = html;
+                    } else {
+                        document.getElementById('person-count').textContent = '0';
+                        personListDiv.innerHTML = '<div class="no-data">등록된 인물이 없습니다</div>';
+                    }
+                    
+                    // 이벤트 로그
+                    const eventLogDiv = document.getElementById('event-log');
+                    if (data.event_log && data.event_log.length > 0) {
+                        let html = '';
+                        // 역순으로 표시 (최신 먼저)
+                        for (let i = data.event_log.length - 1; i >= 0; i--) {
+                            const event = data.event_log[i];
+                            html += `
+                                <div class="event-item ${event.type}">
+                                    <span class="event-time">[${event.time_str}]</span>
+                                    <span class="event-type">${event.type}</span>
+                                    <span>${event.message}</span>
+                                </div>
+                            `;
+                        }
+                        eventLogDiv.innerHTML = html;
+                        
+                        // 자동 스크롤 (최신 이벤트로)
+                        eventLogDiv.scrollTop = 0;
+                    } else {
+                        eventLogDiv.innerHTML = '<div class="no-data">이벤트 없음</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Stats update error:', error);
+                });
+        }
+        
+        function resetRegistry() {
+            if (confirm('정말 Registry를 리셋하시겠습니까?')) {
+                fetch('/api/reset', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'ok') {
+                            alert('Registry가 리셋되었습니다.');
+                            updateStats();
+                        }
+                    })
+                    .catch(error => {
+                        alert('리셋 실패: ' + error);
+                    });
+            }
+        }
+        
+        // 초기 로드
+        updateStats();
+    </script>
+</body>
+</html>
